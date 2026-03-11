@@ -33,6 +33,13 @@
     "plugins": [
       "expo-router",
       "expo-image"
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "b06290e0-5c92-4c7f-8a5b-c5035c00e7a3"
+      }
+    },
+    "owner": "abdullla0900"
   }
 }

@@ -3,14 +3,26 @@ import {
   View,
   Text,
   ScrollView,
-  TouchableOpacity,
   TextInput,
   Modal,
-  Alert,
   Image,
+  Platform,
+  Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import Animated, {
+  FadeInDown,
+  FadeInUp,
+  FadeIn,
+  FadeOut,
+  FadeInLeft,
+  FadeInRight,
+  SlideInDown,
+  SlideOutDown,
+  ZoomIn,
+  LinearTransition,
+} from 'react-native-reanimated';
 import {
   User,
   Target,
@@ -26,6 +38,12 @@ import {
   Droplet,
 } from 'lucide-react-native';
 import { HealthContext } from '../store/health-store';
+import {
+  AnimatedPressable,
+  cardEntering,
+  STAGGER_DELAY,
+} from '../components/animated-utils';
+import * as Haptics from 'expo-haptics';
 
 const PRIMARY = '#007bff';
 const LIGHT_BG = '#f8fafc';
@@ -64,7 +82,16 @@ export default function ProfileScreen() {
     today.caloriesConsumed > 0 && today.caloriesConsumed <= goals.dailyCalories + 200,
   ].filter(Boolean).length;
 
+  const triggerHaptic = () => {
+    if (Platform.OS === 'ios') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+  };
+
   const handleSaveGoals = async () => {
+    if (Platform.OS === 'ios') {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
     await updateGoals({
       dailySteps: parseInt(goalSteps) || 10000,
       dailyWaterMl: Math.round(parseFloat(goalWater) * 1000) || 2500,
@@ -78,6 +105,7 @@ export default function ProfileScreen() {
 
   const handleSaveName = async () => {
     if (newName.trim()) {
+      triggerHaptic();
       await updateProfile(newName.trim());
       setShowEditName(false);
     }
@@ -91,13 +119,16 @@ export default function ProfileScreen() {
           icon: <Target size={20} color="#10b981" />,
           iconBg: '#f0fdf4',
           label: 'Goals',
-          onPress: () => setShowGoalsModal(true),
+          onPress: () => {
+            triggerHaptic();
+            setShowGoalsModal(true);
+          },
         },
         {
           icon: <Bell size={20} color="#f59e0b" />,
           iconBg: '#fffbeb',
           label: 'Notifications',
-          onPress: () => {},
+          onPress: () => { triggerHaptic(); },
         },
       ],
     },
@@ -109,7 +140,7 @@ export default function ProfileScreen() {
           iconBg: '#eef2ff',
           label: 'Integrations',
           trailing: <Text style={{ fontSize: 13, color: textMuted }}>None</Text>,
-          onPress: () => {},
+          onPress: () => { triggerHaptic(); },
         },
       ],
     },
@@ -120,17 +151,19 @@ export default function ProfileScreen() {
           icon: <Shield size={20} color="#64748b" />,
           iconBg: '#f8fafc',
           label: 'Data & Privacy',
-          onPress: () => {},
+          onPress: () => { triggerHaptic(); },
         },
         {
           icon: <Info size={20} color="#64748b" />,
           iconBg: '#f8fafc',
           label: 'About',
-          onPress: () => {},
+          onPress: () => { triggerHaptic(); },
         },
       ],
     },
   ];
+
+  let globalItemIdx = 0;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: LIGHT_BG }} edges={['top']}>
@@ -142,90 +175,107 @@ export default function ProfileScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Header */}
-        <View style={{ alignItems: 'center', paddingTop: 16, paddingBottom: 8 }}>
+        <Animated.View entering={FadeIn.delay(100).duration(350)} style={{ alignItems: 'center', paddingTop: 16, paddingBottom: 8 }}>
           <Text style={{ fontSize: 17, fontWeight: '700', color: textPrimary }}>Profile</Text>
-        </View>
+        </Animated.View>
 
         {/* Profile Card */}
-        <View style={{ paddingHorizontal: 20, marginBottom: 24 }}>
-          <View style={{ backgroundColor: CARD_LIGHT, borderRadius: 20, padding: 24, borderWidth: 1, borderColor, alignItems: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' as any }}>
+        <Animated.View entering={cardEntering(0)} style={{ paddingHorizontal: 20, marginBottom: 24 }}>
+          <View style={{ backgroundColor: CARD_LIGHT, borderRadius: 20, padding: 24, borderWidth: 1, borderColor, alignItems: 'center', ...(Platform.OS === 'web' ? { boxShadow: '0 2px 8px rgba(0,0,0,0.06)' } : { elevation: 2 }), borderCurve: 'continuous' as any }}>
             {/* Avatar */}
-            <TouchableOpacity
-              onPress={() => {
-                setNewName(user?.name || '');
-                setShowEditName(true);
-              }}
-              style={{ marginBottom: 12 }}
-            >
-              <Image 
-                source={{ uri: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80' }}
-                style={{ width: 72, height: 72, borderRadius: 36, borderWidth: 3, borderColor: PRIMARY }}
-              />
-            </TouchableOpacity>
+            <Animated.View entering={ZoomIn.delay(200).duration(450).springify().damping(12)}>
+              <AnimatedPressable
+                onPress={() => {
+                  triggerHaptic();
+                  setNewName(user?.name || '');
+                  setShowEditName(true);
+                }}
+                scaleDown={0.93}
+                style={{ marginBottom: 12 }}
+              >
+                <Image 
+                  source={{ uri: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80' }}
+                  style={{ width: 72, height: 72, borderRadius: 36, borderWidth: 3, borderColor: PRIMARY }}
+                />
+              </AnimatedPressable>
+            </Animated.View>
 
             {/* Name + badge */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Animated.View entering={FadeInDown.delay(300).duration(400)} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <Text style={{ fontSize: 20, fontWeight: '800', color: textPrimary }}>{user?.name || 'User'}</Text>
-              <View style={{ backgroundColor: '#f97316', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
+              <Animated.View entering={ZoomIn.delay(500).duration(300).springify().damping(10)} style={{ backgroundColor: '#f97316', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
                 <Text style={{ fontSize: 9, fontWeight: '800', color: '#fff', letterSpacing: 0.5 }}>PRO</Text>
-              </View>
-            </View>
+              </Animated.View>
+            </Animated.View>
 
             {/* Stats row */}
             <View style={{ flexDirection: 'row', gap: 32, marginTop: 16 }}>
-              <View style={{ alignItems: 'center' }}>
-                <Text style={{ fontSize: 20, fontWeight: '800', color: textPrimary }}>{streakDays}</Text>
-                <Text style={{ fontSize: 11, fontWeight: '600', color: textMuted, marginTop: 2 }}>STREAK</Text>
-              </View>
-              <View style={{ alignItems: 'center' }}>
-                <Text style={{ fontSize: 20, fontWeight: '800', color: textPrimary }}>{goalsCompleted}</Text>
-                <Text style={{ fontSize: 11, fontWeight: '600', color: textMuted, marginTop: 2 }}>GOALS</Text>
-              </View>
-              <View style={{ alignItems: 'center' }}>
-                <Text style={{ fontSize: 20, fontWeight: '800', color: textPrimary }}>{totalWorkouts}</Text>
-                <Text style={{ fontSize: 11, fontWeight: '600', color: textMuted, marginTop: 2 }}>WORKOUTS</Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* Settings sections */}
-        {settingsSections.map((section) => (
-          <View key={section.title} style={{ paddingHorizontal: 20, marginBottom: 24 }}>
-            <Text style={{ fontSize: 11, fontWeight: '700', color: textMuted, letterSpacing: 1.5, marginBottom: 8, paddingHorizontal: 4 }}>
-              {section.title}
-            </Text>
-            <View style={{ backgroundColor: CARD_LIGHT, borderRadius: 16, borderWidth: 1, borderColor, overflow: 'hidden' }}>
-              {section.items.map((item, i) => (
-                <TouchableOpacity
-                  key={item.label}
-                  onPress={item.onPress}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 14,
-                    padding: 16,
-                    borderBottomWidth: i < section.items.length - 1 ? 1 : 0,
-                    borderBottomColor: borderColor,
-                  }}
-                  activeOpacity={0.65}
-                >
-                  <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: item.iconBg, alignItems: 'center', justifyContent: 'center' }}>
-                    {item.icon}
-                  </View>
-                  <Text style={{ flex: 1, fontSize: 15, fontWeight: '600', color: textPrimary }}>{item.label}</Text>
-                  {'trailing' in item && item.trailing ? item.trailing : null}
-                  <ChevronRight size={18} color="#cbd5e1" />
-                </TouchableOpacity>
+              {[
+                { value: streakDays, label: 'STREAK' },
+                { value: goalsCompleted, label: 'GOALS' },
+                { value: totalWorkouts, label: 'WORKOUTS' },
+              ].map((stat, i) => (
+                <Animated.View key={stat.label} entering={FadeInUp.delay(i * 80 + 400).duration(350).springify()} style={{ alignItems: 'center' }}>
+                  <Text style={{ fontSize: 20, fontWeight: '800', color: textPrimary, fontVariant: ['tabular-nums'] }}>{stat.value}</Text>
+                  <Text style={{ fontSize: 11, fontWeight: '600', color: textMuted, marginTop: 2 }}>{stat.label}</Text>
+                </Animated.View>
               ))}
             </View>
           </View>
-        ))}
+        </Animated.View>
+
+        {/* Settings sections */}
+        {settingsSections.map((section, sectionIdx) => {
+          const sectionDelay = sectionIdx * 120 + 200;
+          return (
+            <Animated.View key={section.title} entering={FadeInDown.delay(sectionDelay).duration(400).springify().damping(18)} style={{ paddingHorizontal: 20, marginBottom: 24 }}>
+              <Animated.Text entering={FadeIn.delay(sectionDelay + 100).duration(300)} style={{ fontSize: 11, fontWeight: '700', color: textMuted, letterSpacing: 1.5, marginBottom: 8, paddingHorizontal: 4 }}>
+                {section.title}
+              </Animated.Text>
+              <View style={{ backgroundColor: CARD_LIGHT, borderRadius: 16, borderWidth: 1, borderColor, overflow: 'hidden', borderCurve: 'continuous' as any }}>
+                {section.items.map((item, i) => {
+                  globalItemIdx++;
+                  const itemIdx = globalItemIdx;
+                  return (
+                    <Animated.View
+                      key={item.label}
+                      entering={FadeInRight.delay(itemIdx * 60 + sectionDelay).duration(350)}
+                    >
+                      <AnimatedPressable
+                        onPress={item.onPress}
+                        scaleDown={0.98}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 14,
+                          padding: 16,
+                          borderBottomWidth: i < section.items.length - 1 ? 1 : 0,
+                          borderBottomColor: borderColor,
+                        }}
+                      >
+                        <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: item.iconBg, alignItems: 'center', justifyContent: 'center', borderCurve: 'continuous' }}>
+                          {item.icon}
+                        </View>
+                        <Text style={{ flex: 1, fontSize: 15, fontWeight: '600', color: textPrimary }}>{item.label}</Text>
+                        {'trailing' in item && item.trailing ? item.trailing : null}
+                        <ChevronRight size={18} color="#cbd5e1" />
+                      </AnimatedPressable>
+                    </Animated.View>
+                  );
+                })}
+              </View>
+            </Animated.View>
+          );
+        })}
 
         {/* Sign Out */}
-        <View style={{ paddingHorizontal: 20, marginBottom: 16 }}>
-          <TouchableOpacity
-            onPress={logout}
+        <Animated.View entering={FadeInUp.delay(800).duration(400)} style={{ paddingHorizontal: 20, marginBottom: 16 }}>
+          <AnimatedPressable
+            onPress={() => {
+              if (Platform.OS === 'ios') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+              logout();
+            }}
+            scaleDown={0.97}
             style={{
               backgroundColor: CARD_LIGHT,
               borderRadius: 16,
@@ -233,32 +283,41 @@ export default function ProfileScreen() {
               alignItems: 'center',
               borderWidth: 1,
               borderColor: '#fecaca',
+              borderCurve: 'continuous',
             }}
-            activeOpacity={0.65}
           >
             <Text style={{ fontSize: 16, fontWeight: '700', color: '#ef4444' }}>Sign Out</Text>
-          </TouchableOpacity>
-        </View>
+          </AnimatedPressable>
+        </Animated.View>
 
         {/* Version */}
-        <Text style={{ textAlign: 'center', fontSize: 12, color: textMuted, marginTop: 4 }}>
+        <Animated.Text entering={FadeIn.delay(900).duration(300)} style={{ textAlign: 'center', fontSize: 12, color: textMuted, marginTop: 4 }}>
           Version 1.0.0 (1)
-        </Text>
+        </Animated.Text>
       </ScrollView>
 
       {/* Goals Modal */}
-      <Modal visible={showGoalsModal} animationType="slide" transparent>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'flex-end' }}>
-          <View style={{ backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 }}>
+      <Modal visible={showGoalsModal} animationType="none" transparent>
+        <Animated.View
+          entering={FadeIn.duration(250)}
+          exiting={FadeOut.duration(200)}
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'flex-end' }}
+        >
+          <Pressable style={{ flex: 1 }} onPress={() => setShowGoalsModal(false)} />
+          <Animated.View
+            entering={SlideInDown.duration(500).springify().damping(20).stiffness(90)}
+            exiting={SlideOutDown.duration(300)}
+            style={{ backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40, borderCurve: 'continuous' }}
+          >
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <Text style={{ fontSize: 20, fontWeight: '800', color: textPrimary }}>Edit Goals</Text>
-              <TouchableOpacity onPress={() => setShowGoalsModal(false)}>
+              <Animated.Text entering={FadeInLeft.duration(350)} style={{ fontSize: 20, fontWeight: '800', color: textPrimary }}>Edit Goals</Animated.Text>
+              <AnimatedPressable onPress={() => setShowGoalsModal(false)} scaleDown={0.85}>
                 <X size={24} color={textMuted} />
-              </TouchableOpacity>
+              </AnimatedPressable>
             </View>
 
             <View style={{ gap: 12 }}>
-              <View>
+              <Animated.View entering={FadeInDown.delay(100).duration(300)}>
                 <Text style={{ fontSize: 12, fontWeight: '600', color: textMuted, marginBottom: 4 }}>Daily Steps</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f1f5f9', borderRadius: 12, paddingHorizontal: 14 }}>
                   <Footprints size={16} color={PRIMARY} />
@@ -270,8 +329,8 @@ export default function ProfileScreen() {
                   />
                   <Text style={{ fontSize: 13, color: textMuted }}>steps</Text>
                 </View>
-              </View>
-              <View>
+              </Animated.View>
+              <Animated.View entering={FadeInDown.delay(160).duration(300)}>
                 <Text style={{ fontSize: 12, fontWeight: '600', color: textMuted, marginBottom: 4 }}>Daily Water</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f1f5f9', borderRadius: 12, paddingHorizontal: 14 }}>
                   <Droplet size={16} color="#06b6d4" />
@@ -283,8 +342,8 @@ export default function ProfileScreen() {
                   />
                   <Text style={{ fontSize: 13, color: textMuted }}>liters</Text>
                 </View>
-              </View>
-              <View>
+              </Animated.View>
+              <Animated.View entering={FadeInDown.delay(220).duration(300)}>
                 <Text style={{ fontSize: 12, fontWeight: '600', color: textMuted, marginBottom: 4 }}>Daily Calories</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f1f5f9', borderRadius: 12, paddingHorizontal: 14 }}>
                   <Flame size={16} color="#f59e0b" />
@@ -296,8 +355,8 @@ export default function ProfileScreen() {
                   />
                   <Text style={{ fontSize: 13, color: textMuted }}>kcal</Text>
                 </View>
-              </View>
-              <View>
+              </Animated.View>
+              <Animated.View entering={FadeInDown.delay(280).duration(300)}>
                 <Text style={{ fontSize: 12, fontWeight: '600', color: textMuted, marginBottom: 4 }}>Macros (g)</Text>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   <View style={{ flex: 1 }}>
@@ -334,49 +393,64 @@ export default function ProfileScreen() {
                     <Text style={{ fontSize: 10, textAlign: 'center', color: textMuted, marginTop: 4 }}>Fat</Text>
                   </View>
                 </View>
-              </View>
+              </Animated.View>
             </View>
 
-            <TouchableOpacity
-              onPress={handleSaveGoals}
-              style={{ marginTop: 20, backgroundColor: PRIMARY, paddingVertical: 16, borderRadius: 14, alignItems: 'center', boxShadow: '0 4px 14px rgba(0,123,255,0.35)' as any }}
-              activeOpacity={0.85}
-            >
-              <Text style={{ fontSize: 16, fontWeight: '700', color: '#fff' }}>Save Goals</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+            <Animated.View entering={FadeInUp.delay(350).duration(350)}>
+              <AnimatedPressable
+                onPress={handleSaveGoals}
+                scaleDown={0.97}
+                style={{ marginTop: 20, backgroundColor: PRIMARY, paddingVertical: 16, borderRadius: 14, alignItems: 'center', boxShadow: '0 4px 14px rgba(0,123,255,0.35)' as any, borderCurve: 'continuous' }}
+              >
+                <Text style={{ fontSize: 16, fontWeight: '700', color: '#fff' }}>Save Goals</Text>
+              </AnimatedPressable>
+            </Animated.View>
+          </Animated.View>
+        </Animated.View>
       </Modal>
 
       {/* Edit Name Modal */}
-      <Modal visible={showEditName} animationType="fade" transparent>
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', paddingHorizontal: 32 }}>
-          <View style={{ backgroundColor: '#fff', borderRadius: 20, padding: 24 }}>
-            <Text style={{ fontSize: 18, fontWeight: '700', color: textPrimary, marginBottom: 16 }}>Edit Name</Text>
-            <TextInput
-              style={{ backgroundColor: '#f1f5f9', borderRadius: 12, padding: 14, fontSize: 15, color: textPrimary }}
-              value={newName}
-              onChangeText={setNewName}
-              placeholder="Your name"
-              placeholderTextColor={textMuted}
-              autoFocus
-            />
-            <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
-              <TouchableOpacity
+      <Modal visible={showEditName} animationType="none" transparent>
+        <Animated.View
+          entering={FadeIn.duration(250)}
+          exiting={FadeOut.duration(200)}
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', paddingHorizontal: 32 }}
+        >
+          <Animated.View
+            entering={ZoomIn.duration(400).springify().damping(16).stiffness(120)}
+            style={{ backgroundColor: '#fff', borderRadius: 20, padding: 24, borderCurve: 'continuous' }}
+          >
+            <Animated.Text entering={FadeInDown.delay(100).duration(300)} style={{ fontSize: 18, fontWeight: '700', color: textPrimary, marginBottom: 16 }}>
+              Edit Name
+            </Animated.Text>
+            <Animated.View entering={FadeInDown.delay(150).duration(300)}>
+              <TextInput
+                style={{ backgroundColor: '#f1f5f9', borderRadius: 12, padding: 14, fontSize: 15, color: textPrimary }}
+                value={newName}
+                onChangeText={setNewName}
+                placeholder="Your name"
+                placeholderTextColor={textMuted}
+                autoFocus
+              />
+            </Animated.View>
+            <Animated.View entering={FadeInUp.delay(200).duration(300)} style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
+              <AnimatedPressable
                 onPress={() => setShowEditName(false)}
-                style={{ flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center', backgroundColor: '#f1f5f9' }}
+                scaleDown={0.95}
+                style={{ flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center', backgroundColor: '#f1f5f9', borderCurve: 'continuous' }}
               >
                 <Text style={{ fontSize: 14, fontWeight: '600', color: textMuted }}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
+              </AnimatedPressable>
+              <AnimatedPressable
                 onPress={handleSaveName}
-                style={{ flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center', backgroundColor: PRIMARY }}
+                scaleDown={0.95}
+                style={{ flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center', backgroundColor: PRIMARY, borderCurve: 'continuous' }}
               >
                 <Text style={{ fontSize: 14, fontWeight: '700', color: '#fff' }}>Save</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
+              </AnimatedPressable>
+            </Animated.View>
+          </Animated.View>
+        </Animated.View>
       </Modal>
     </SafeAreaView>
   );
